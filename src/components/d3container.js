@@ -188,7 +188,6 @@ class BarChart extends Component {
             },
             color = d3.scaleOrdinal(d3.schemeCategory20);
 
-        var toolTips = d3.select("#" + el).select(".tooltip");
         //  set svg container
         var svg = d3.select("#" + el).append("svg")
             .attr("width", width + margin.left + margin.right)
@@ -234,7 +233,7 @@ class BarChart extends Component {
             return sankey;
         };
 
-        sankey.nodeWidth(10)
+        sankey.nodeWidth(0)
             .nodePadding(15)
             .size([width, height]);
 
@@ -262,9 +261,7 @@ class BarChart extends Component {
                     x2 = xi(curvature),
                     x3 = xi(1 - curvature),
                     x4 = xj(curvature),
-                    x5 = xj(1 - curvature),
-                    m = (x0 + x1) / 2;
-                // console.log(d)
+                    x5 = xj(1 - curvature);
                 var y0_top = d.source.y + d.sy; //右左下
                 var y0_bottom = d.source.y + d.sy + d.dy1, //右左下
                     y1_top = d.target.y + d.ty; // + d.ty;右右下
@@ -301,6 +298,9 @@ class BarChart extends Component {
         link.enter()
             .append("path")
             .attr("d", path)
+            .attr("stroke", function (d) {
+                return d.color = color(d.source.name.replace(/ .*/, ""));
+            })
             .style("stroke-width", function (d) {
                 // return Math.max(1, d.dy);
                 return d.dy;
@@ -324,30 +324,14 @@ class BarChart extends Component {
 
         node.enter()
             .append("g")
-            .attr("transform", function (d) {
-                return "translate(" + d.x + "," + d.y + ")";
-            })
-            // .append("rect")
-            // .attr("height", function (d) { return d.dy; })
-            // .attr("width", sankey.nodeWidth())
-            // .style("fill", function (d) {
-            //     return d.color = color(d.name.replace(/ .*/, ""));
-            // })
-            // .style("stroke", function (d) {
-            //     return d3.rgb(d.color).darker(2);
-            // })
-            // .text(function (d) {
-            //     return d.name + "\n" + format(d.value);
-            // })
             .append("text")
             .attr('x', function (d) {
                 var nw = textSize("16px", "Arial", d.name).width;
-                return d.dx - nw - 10;
+                return d.x - nw - 10;
             })
             .attr('y', function (d) {
-                console.log(d)
                 var nh = textSize("16px", "Arial", d.name).height;
-                return d.dy;
+                return d.y + d.dy / 2 + nh / 4;
             })
             .style("fill", function (d) {
                 return d.color = color(d.name.replace(/ .*/, ""));
@@ -355,7 +339,7 @@ class BarChart extends Component {
             .style('font-size', 16)
             .style('font-family', "arial")
             .text(function (d) {
-                if (d.first == true) {
+                if (d.first === true) {
                     return d.name;
                 }
             });
@@ -371,16 +355,17 @@ class BarChart extends Component {
             span.style.fontFamily = fontFamily;
             span.style.display = "inline-block";
             document.body.appendChild(span);
-            if (typeof span.textContent != "undefined") {
+            if (typeof span.textContent !== "undefined") {
                 span.textContent = text;
             } else {
                 span.innerText = text;
             }
             result.width = parseFloat(window.getComputedStyle(span).width) - result.width;
             result.height = parseFloat(window.getComputedStyle(span).height) - result.height;
+            var parent = span.parentNode;
+            parent.removeChild(span);
             return result;
         }
-
 
         //添加时间刻度线
         timeLine();
@@ -441,7 +426,6 @@ class BarChart extends Component {
         function computeItemNode() {
             items.forEach(function (item) {
                 item.node.forEach(function (node) {
-                    var node_id = node;
                     node = {};
                     node.cluster = nodes[node];
                 })
@@ -488,34 +472,15 @@ class BarChart extends Component {
                     return d.values;
                 });
 
-
             initializeNodeDepth();
             resolveCollisions();
-            for (var alpha = 1; iterations > 0; --iterations) {
-                // relaxRightToLeft(alpha *= .99);/////
-                // resolveCollisions();
-                // relaxLeftToRight(alpha);/////symmetric if the layout  jixiangyu
-                // resolveCollisions();
-            }
 
-
-            //
             function initializeNodeDepth() {
                 var ky = d3.min(nodesByBreadth, function (nodes) {
                     return (size[1] - (nodes.length - 1) * nodePadding) / d3.sum(nodes, value);
                 });
 
                 nodesByBreadth.forEach(function (nodes) {
-
-                    var ojoj = [1, 2, 3, 1];
-                    //console.log(d3.sum(ojoj,sum_jixy));
-                    //console.log("this sum_test")
-                    function sum_jixy() {
-                        // return center(link.source) * link.value;
-                        return 2;
-                    }
-
-
                     nodes.forEach(function (node, i) {
                         node.y = (size[1] / 2) - node.w;
                         //node.dy=80;
@@ -535,41 +500,6 @@ class BarChart extends Component {
                     link.dy2 = link.target.w * link.w2 * ky / (d3.sum(link.target.targetLinks, weight2) + 0.01);
                 });
             }
-
-            function relaxLeftToRight(alpha) {
-                nodesByBreadth.forEach(function (nodes, breadth) {
-                    nodes.forEach(function (node) {
-                        if (node.targetLinks.length) {
-                            var y = d3.sum(node.targetLinks, weightedSource) / (d3.sum(node.targetLinks, weight1) + 0.01);
-                            node.y += (y - center(node)) * alpha; /////jixiangyu   the y-cordinate of the node
-                        }
-                    });
-                });
-
-                function weightedSource(link) {
-                    // return center(link.source) * link.value;
-                    return center(link.source) * link.w1;
-                }
-            }
-
-            function relaxRightToLeft(alpha) {
-                nodesByBreadth.slice().reverse().forEach(function (nodes) {
-                    nodes.forEach(function (node) {
-                        if (node.sourceLinks.length) {
-                            ////jixiangyu   the implementation of the algo
-                            var y = d3.sum(node.sourceLinks, weightedTarget) / (d3.sum(node.sourceLinks, weight2) + 0.01);
-                            node.y += (y - center(node)) * alpha;
-
-                        }
-                    });
-                });
-
-                function weightedTarget(link) {
-                    // return center(link.target) * link.value;
-                    return center(link.target) * link.w2;
-                }
-            }
-
             function resolveCollisions() {
                 nodesByBreadth.forEach(function (nodes) {
                     var node,
@@ -602,7 +532,6 @@ class BarChart extends Component {
                     }
                 });
             }
-
             function ascendingDepth(a, b) {
                 return a.y - b.y;
             }
@@ -632,9 +561,6 @@ class BarChart extends Component {
             function ascendingTargetDepth(a, b) {
                 return a.target.y - b.target.y;
             }
-        }
-        function center(node) {
-            return node.y + node.dy / 2;
         }
         function value(link) {
             return link.value;
